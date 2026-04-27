@@ -1,0 +1,79 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    branches:
+      - main
+  
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+
+jobs:
+
+  build-and-push:
+    name: Build, Scan & Push — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - user-service
+          - product-service
+          - cart-service
+          - order-service
+          - payment-service
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: vars
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "IMAGE_TAG=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "IMAGE_URI=${{ env.ECR_REGISTRY }}/shopkart/${{ matrix.service }}:${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "IMAGE_URI_LATEST=${{ env.ECR_REGISTRY }}/shopkart/${{ matrix.service }}:latest" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ steps.vars.outputs.IMAGE_URI }} \
+            -t ${{ steps.vars.outputs.IMAGE_URI_LATEST }} \
+            ./${{ matrix.service }}
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.vars.outputs.IMAGE_URI }}
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ steps.vars.outputs.IMAGE_URI }}
+          docker push ${{ steps.vars.outputs.IMAGE_URI_LATEST }}
+
+      - name: Print image details
+        run: |
+          echo "====================================="
+          echo "Service  : ${{ matrix.service }}"
+          echo "Image tag: ${{ steps.vars.outputs.IMAGE_TAG }}"
+          echo "Image URI: ${{ steps.vars.outputs.IMAGE_URI }}"
+          echo "====================================="
