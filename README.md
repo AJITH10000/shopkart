@@ -117,12 +117,3 @@ curl -X POST http://localhost:8004/payments \
 | REDIS_URL | cart | redis://localhost:6379 | Redis connection |
 | SECRET_KEY | user | shopkart-secret | JWT signing key |
 
-## Next Steps (DevOps Layer)
-
-- [ ] Push images to Amazon ECR
-- [ ] Provision EKS cluster with Terraform
-- [ ] Write Helm charts for each service
-- [ ] Set up GitHub Actions CI/CD pipeline
-- [ ] Deploy with ArgoCD (GitOps)
-- [ ] Add Vault for secrets management
-- [ ] Set up Prometheus + Grafana observability
